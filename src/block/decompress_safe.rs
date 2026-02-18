@@ -11,6 +11,28 @@ use alloc::vec;
 #[allow(unused_imports)]
 use alloc::vec::Vec;
 
+#[allow(dead_code)]
+#[derive(Default, Clone, Copy)]
+pub(crate) struct DecompressProfileSnapshot {
+    pub fast_token_hits: u64,
+    pub duplicate_nonoverlap_wild: u64,
+    pub duplicate_near_end_exact_nonoverlap: u64,
+    pub duplicate_overlap_small_u64: u64,
+    pub duplicate_overlap_large_offset_chunk: u64,
+    pub duplicate_overlap_fallback_byte: u64,
+    pub copy_from_dict_calls: u64,
+    pub literal_bytes: u64,
+    pub match_bytes: u64,
+}
+
+#[allow(dead_code)]
+pub(crate) fn reset_decompress_profile() {}
+
+#[allow(dead_code)]
+pub(crate) fn read_decompress_profile() -> DecompressProfileSnapshot {
+    DecompressProfileSnapshot::default()
+}
+
 /// Read an integer.
 ///
 /// In LZ4, we encode small integers in a way that we can have an arbitrary number of bytes. In

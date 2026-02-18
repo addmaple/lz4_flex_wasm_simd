@@ -7,6 +7,113 @@ use crate::sink::{PtrSink, Sink};
 #[allow(unused_imports)]
 use alloc::vec::Vec;
 
+#[allow(dead_code)]
+#[derive(Default, Clone, Copy)]
+pub(crate) struct DecompressProfileSnapshot {
+    pub fast_token_hits: u64,
+    pub duplicate_nonoverlap_wild: u64,
+    pub duplicate_near_end_exact_nonoverlap: u64,
+    pub duplicate_overlap_small_u64: u64,
+    pub duplicate_overlap_large_offset_chunk: u64,
+    pub duplicate_overlap_fallback_byte: u64,
+    pub copy_from_dict_calls: u64,
+    pub literal_bytes: u64,
+    pub match_bytes: u64,
+}
+
+#[cfg(feature = "decompress-prof")]
+mod profile {
+    use super::DecompressProfileSnapshot;
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    pub(super) static FAST_TOKEN_HITS: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DUP_NONOVERLAP_WILD: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DUP_NEAR_END_EXACT_NONOVERLAP: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DUP_OVERLAP_SMALL_U64: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DUP_OVERLAP_LARGE_OFFSET_CHUNK: AtomicU64 = AtomicU64::new(0);
+    pub(super) static DUP_OVERLAP_FALLBACK_BYTE: AtomicU64 = AtomicU64::new(0);
+    pub(super) static COPY_FROM_DICT_CALLS: AtomicU64 = AtomicU64::new(0);
+    pub(super) static LITERAL_BYTES: AtomicU64 = AtomicU64::new(0);
+    pub(super) static MATCH_BYTES: AtomicU64 = AtomicU64::new(0);
+
+    #[inline]
+    pub(super) fn inc(counter: &AtomicU64, n: u64) {
+        counter.fetch_add(n, Ordering::Relaxed);
+    }
+
+    pub(super) fn reset() {
+        FAST_TOKEN_HITS.store(0, Ordering::Relaxed);
+        DUP_NONOVERLAP_WILD.store(0, Ordering::Relaxed);
+        DUP_NEAR_END_EXACT_NONOVERLAP.store(0, Ordering::Relaxed);
+        DUP_OVERLAP_SMALL_U64.store(0, Ordering::Relaxed);
+        DUP_OVERLAP_LARGE_OFFSET_CHUNK.store(0, Ordering::Relaxed);
+        DUP_OVERLAP_FALLBACK_BYTE.store(0, Ordering::Relaxed);
+        COPY_FROM_DICT_CALLS.store(0, Ordering::Relaxed);
+        LITERAL_BYTES.store(0, Ordering::Relaxed);
+        MATCH_BYTES.store(0, Ordering::Relaxed);
+    }
+
+    pub(super) fn snapshot() -> DecompressProfileSnapshot {
+        DecompressProfileSnapshot {
+            fast_token_hits: FAST_TOKEN_HITS.load(Ordering::Relaxed),
+            duplicate_nonoverlap_wild: DUP_NONOVERLAP_WILD.load(Ordering::Relaxed),
+            duplicate_near_end_exact_nonoverlap: DUP_NEAR_END_EXACT_NONOVERLAP
+                .load(Ordering::Relaxed),
+            duplicate_overlap_small_u64: DUP_OVERLAP_SMALL_U64.load(Ordering::Relaxed),
+            duplicate_overlap_large_offset_chunk: DUP_OVERLAP_LARGE_OFFSET_CHUNK
+                .load(Ordering::Relaxed),
+            duplicate_overlap_fallback_byte: DUP_OVERLAP_FALLBACK_BYTE.load(Ordering::Relaxed),
+            copy_from_dict_calls: COPY_FROM_DICT_CALLS.load(Ordering::Relaxed),
+            literal_bytes: LITERAL_BYTES.load(Ordering::Relaxed),
+            match_bytes: MATCH_BYTES.load(Ordering::Relaxed),
+        }
+    }
+}
+
+#[cfg(not(feature = "decompress-prof"))]
+mod profile {
+    use super::DecompressProfileSnapshot;
+
+    #[inline]
+    #[allow(dead_code)]
+    pub(super) fn inc(_counter: &(), _n: u64) {}
+
+    #[inline]
+    pub(super) fn reset() {}
+
+    #[inline]
+    pub(super) fn snapshot() -> DecompressProfileSnapshot {
+        DecompressProfileSnapshot::default()
+    }
+}
+
+#[cfg(feature = "decompress-prof")]
+macro_rules! prof_inc {
+    ($counter:ident, $n:expr) => {
+        crate::block::decompress::profile::inc(
+            &crate::block::decompress::profile::$counter,
+            $n as u64,
+        )
+    };
+}
+
+#[cfg(not(feature = "decompress-prof"))]
+macro_rules! prof_inc {
+    ($counter:ident, $n:expr) => {
+        let _ = &$n;
+    };
+}
+
+#[allow(dead_code)]
+pub(crate) fn reset_decompress_profile() {
+    profile::reset();
+}
+
+#[allow(dead_code)]
+pub(crate) fn read_decompress_profile() -> DecompressProfileSnapshot {
+    profile::snapshot()
+}
+
 /// Copies data to output_ptr by self-referential copy from start and match_length
 #[inline]
 unsafe fn duplicate(
@@ -21,11 +128,19 @@ unsafe fn duplicate(
     // Considering that `wild_copy_match_16` can copy up to `16 - 1` extra bytes.
     // Defer to `duplicate_overlapping` in case of an overlapping match
     // OR the if the wild copy would copy beyond the end of the output.
-    if (output_ptr.offset_from(start) as usize) < match_length + 16 - 1
-        || (output_end.offset_from(*output_ptr) as usize) < match_length + 16 - 1
-    {
+    let offset = output_ptr.offset_from(start) as usize;
+    let remaining_output = output_end.offset_from(*output_ptr) as usize;
+    if offset < match_length + 16 - 1 || remaining_output < match_length + 16 - 1 {
+        // If we're close to output end but match does not overlap, prefer exact copy.
+        if offset >= match_length {
+            prof_inc!(DUP_NEAR_END_EXACT_NONOVERLAP, 1);
+            core::ptr::copy_nonoverlapping(start, *output_ptr, match_length);
+            *output_ptr = output_ptr.add(match_length);
+            return;
+        }
         duplicate_overlapping(output_ptr, start, match_length);
     } else {
+        prof_inc!(DUP_NONOVERLAP_WILD, 1);
         debug_assert!(
             output_ptr.add(match_length / 16 * 16 + ((match_length % 16) != 0) as usize * 16)
                 <= output_end
@@ -52,6 +167,52 @@ fn wild_copy_from_src_16(mut source: *const u8, mut dst_ptr: *mut u8, num_items:
     }
 }
 
+#[inline]
+unsafe fn duplicate_overlapping_small_offset_u64(
+    output_ptr: &mut *mut u8,
+    start: *const u8,
+    offset: usize,
+    match_length: usize,
+) -> bool {
+    if !matches!(offset, 1 | 2 | 4 | 8) || match_length < 8 {
+        return false;
+    }
+    prof_inc!(DUP_OVERLAP_SMALL_U64, 1);
+
+    let pattern64 = match offset {
+        1 => {
+            let b = start.read() as u64;
+            b * 0x0101_0101_0101_0101
+        }
+        2 => {
+            let p = (start as *const u16).read_unaligned() as u64;
+            p * 0x0001_0001_0001_0001
+        }
+        4 => {
+            let p = (start as *const u32).read_unaligned() as u64;
+            p | (p << 32)
+        }
+        8 => (start as *const u64).read_unaligned(),
+        _ => unreachable!(),
+    };
+
+    let mut dst = *output_ptr;
+    let dst_end = dst.add(match_length);
+    while dst.add(8) <= dst_end {
+        (dst as *mut u64).write_unaligned(pattern64);
+        dst = dst.add(8);
+    }
+    let pattern_bytes = pattern64.to_le_bytes();
+    let mut tail = 0usize;
+    while dst < dst_end {
+        dst.write(pattern_bytes[tail % offset]);
+        dst = dst.add(1);
+        tail += 1;
+    }
+    *output_ptr = dst;
+    true
+}
+
 /// Copy function, if the data start + match_length overlaps into output_ptr
 #[inline]
 #[cfg_attr(feature = "nightly", optimize(size))] // to avoid loop unrolling
@@ -60,6 +221,26 @@ unsafe fn duplicate_overlapping(
     mut start: *const u8,
     match_length: usize,
 ) {
+    let offset = output_ptr.offset_from(start) as usize;
+    if duplicate_overlapping_small_offset_u64(output_ptr, start, offset, match_length) {
+        return;
+    }
+    if offset >= 16 {
+        prof_inc!(DUP_OVERLAP_LARGE_OFFSET_CHUNK, 1);
+        let mut dst = *output_ptr;
+        let mut remaining = match_length;
+        while remaining != 0 {
+            let step = remaining.min(offset);
+            core::ptr::copy_nonoverlapping(start, dst, step);
+            start = start.add(step);
+            dst = dst.add(step);
+            remaining -= step;
+        }
+        *output_ptr = dst;
+        return;
+    }
+    prof_inc!(DUP_OVERLAP_FALLBACK_BYTE, 1);
+
     // There is an edge case when output_ptr == start, which causes the decoder to potentially
     // expose up to match_length bytes of uninitialized data in the decompression buffer.
     // To prevent that we write a dummy zero to output, which will zero out output in such cases.
@@ -95,6 +276,7 @@ unsafe fn copy_from_dict(
     offset: usize,
     match_length: usize,
 ) -> usize {
+    prof_inc!(COPY_FROM_DICT_CALLS, 1);
     // If we're here we know offset > output pos, so we have at least 1 byte to copy from dict
     debug_assert!(output_ptr.offset_from(output_base) >= 0);
     debug_assert!(offset > output_ptr.offset_from(output_base) as usize);
@@ -218,7 +400,7 @@ pub(crate) fn decompress_internal<const USE_DICT: bool, S: Sink>(
     };
     let output_base = unsafe { output.base_mut_ptr() };
     let output_end = unsafe { output_base.add(output.capacity()) };
-    let output_start_pos_ptr = unsafe { output.base_mut_ptr().add(output.pos()) as *mut u8 };
+    let output_start_pos_ptr = unsafe { output.base_mut_ptr().add(output.pos()) };
     let mut output_ptr = output_start_pos_ptr;
 
     let mut input_ptr = input.as_ptr();
@@ -263,6 +445,9 @@ pub(crate) fn decompress_internal<const USE_DICT: bool, S: Sink>(
         {
             let literal_length = (token >> 4) as usize;
             let mut match_length = MINMATCH + (token & 0xF) as usize;
+            prof_inc!(FAST_TOKEN_HITS, 1);
+            prof_inc!(LITERAL_BYTES, literal_length);
+            prof_inc!(MATCH_BYTES, match_length);
 
             // output_ptr <= safe_output_ptr should guarantee we have enough space in output
             debug_assert!(
@@ -354,6 +539,7 @@ pub(crate) fn decompress_internal<const USE_DICT: bool, S: Sink>(
                 }
             }
             unsafe {
+                prof_inc!(LITERAL_BYTES, literal_length);
                 fastcpy_unsafe::slice_copy(input_ptr, output_ptr, literal_length);
                 output_ptr = output_ptr.add(literal_length);
                 input_ptr = input_ptr.add(literal_length);
@@ -388,6 +574,7 @@ pub(crate) fn decompress_internal<const USE_DICT: bool, S: Sink>(
             // read the extra integer.
             match_length += read_integer_ptr(&mut input_ptr, input_ptr_end)? as usize;
         }
+        prof_inc!(MATCH_BYTES, match_length);
 
         // We now copy from the already decompressed buffer. This allows us for storing duplicates
         // by simply referencing the other location.
@@ -472,7 +659,6 @@ pub fn decompress_into_with_dict(
 /// # Panics
 /// May panic if the parameter `min_uncompressed_size` is smaller than the
 /// uncompressed data.
-
 #[inline]
 pub fn decompress_with_dict(
     input: &[u8],
@@ -529,6 +715,46 @@ pub fn decompress_size_prepended_with_dict(
 #[cfg(test)]
 mod test {
     use super::*;
+    use lz4_flex as upstream_lz4;
+
+    fn encode_len(mut len: usize) -> (u8, Vec<u8>) {
+        if len < 15 {
+            return (len as u8, Vec::new());
+        }
+        len -= 15;
+        let mut extras = Vec::new();
+        while len >= 255 {
+            extras.push(255);
+            len -= 255;
+        }
+        extras.push(len as u8);
+        (15, extras)
+    }
+
+    fn encode_single_match_block(literals: &[u8], offset: u16, match_length: usize) -> Vec<u8> {
+        let (lit_nibble, lit_extra) = encode_len(literals.len());
+        let match_token_len = match_length.saturating_sub(MINMATCH);
+        let (match_nibble, match_extra) = encode_len(match_token_len);
+
+        let mut out = Vec::with_capacity(literals.len() + 16);
+        out.push((lit_nibble << 4) | match_nibble);
+        out.extend_from_slice(&lit_extra);
+        out.extend_from_slice(literals);
+        out.extend_from_slice(&offset.to_le_bytes());
+        out.extend_from_slice(&match_extra);
+        // Final sequence with no literals and no match.
+        out.push(0);
+        out
+    }
+
+    fn expected_after_match(literals: &[u8], offset: usize, match_length: usize) -> Vec<u8> {
+        let mut out = literals.to_vec();
+        for _ in 0..match_length {
+            let idx = out.len() - offset;
+            out.push(out[idx]);
+        }
+        out
+    }
 
     #[test]
     fn all_literal() {
@@ -540,5 +766,71 @@ mod test {
     fn offset_oob() {
         decompress(&[0x10, b'a', 2, 0], 4).unwrap_err();
         decompress(&[0x40, b'a', 1, 0], 4).unwrap_err();
+    }
+
+    #[test]
+    fn overlap_offsets_1_to_16() {
+        for offset in 1usize..=16 {
+            let literals: Vec<u8> = (0..offset).map(|i| b'a' + (i as u8 % 26)).collect();
+            let match_length = 96usize;
+            let compressed = encode_single_match_block(&literals, offset as u16, match_length);
+            let expected = expected_after_match(&literals, offset, match_length);
+            let decoded = decompress(&compressed, expected.len()).unwrap();
+            assert_eq!(decoded, expected, "offset={offset}");
+        }
+    }
+
+    #[test]
+    fn near_output_end_overlap_copy() {
+        let literals = b"XYZ";
+        let match_length = 29usize;
+        let compressed = encode_single_match_block(literals, 3, match_length);
+        let expected = expected_after_match(literals, 3, match_length);
+        let mut out = vec![0u8; expected.len()];
+        let wrote = decompress_into(&compressed, &mut out).unwrap();
+        assert_eq!(wrote, expected.len());
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn dictionary_crossing_edge_case() {
+        let ext_dict = b"abcdefghijklmno";
+        let compressed = [0x04, 0x05, 0x00, 0x00];
+        let mut out = [0u8; 8];
+        let wrote = decompress_into_with_dict(&compressed, &mut out, ext_dict).unwrap();
+        assert_eq!(wrote, out.len());
+        assert_eq!(&out, b"klmnoklm");
+    }
+
+    #[test]
+    fn differential_against_upstream_lz4() {
+        fn xorshift64(state: &mut u64) -> u64 {
+            let mut x = *state;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            *state = x;
+            x
+        }
+
+        let mut state = 0x1234_5678_9abc_def0u64;
+        for _ in 0..200 {
+            let size = (xorshift64(&mut state) as usize % 8192) + 1;
+            let mut input = vec![0u8; size];
+            for b in &mut input {
+                *b = xorshift64(&mut state) as u8;
+            }
+
+            let ours_comp = crate::block::compress_prepend_size(&input);
+            let upstream_comp = upstream_lz4::block::compress_prepend_size(&input);
+
+            let ours_dec = decompress_size_prepended(&ours_comp).unwrap();
+            let upstream_dec = upstream_lz4::block::decompress_size_prepended(&ours_comp).unwrap();
+            assert_eq!(ours_dec, input);
+            assert_eq!(upstream_dec, input);
+
+            let ours_from_upstream = decompress_size_prepended(&upstream_comp).unwrap();
+            assert_eq!(ours_from_upstream, input);
+        }
     }
 }
