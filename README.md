@@ -21,6 +21,15 @@ Example:
 RUSTFLAGS='-C target-feature=+simd128' cargo test --target wasm32-wasip1 --features frame,block
 ```
 
+For runtime verification and scalar-vs-SIMD benchmark numbers:
+
+```bash
+./scripts/benchmark_wasm.sh
+```
+
+This script builds `frame,block,wasm-exports` variants, runs wasm entrypoint checks with `wasmtime`,
+and writes `wasm-benchmark-report.txt`.
+
 ## Provenance
 
 This crate vendors selected code from:

@@ -28,11 +28,29 @@ jobs:
         with:
           targets: wasm32-wasip1,wasm32-unknown-unknown
       - name: Check wasm (scalar)
-        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block
+        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block,wasm-exports
       - name: Check wasm (+simd128)
         env:
           RUSTFLAGS: -C target-feature=+simd128
-        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block
+        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block,wasm-exports
+
+  wasm-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - name: Install wasmtime
+        run: |
+          curl -sSf https://wasmtime.dev/install.sh | bash
+          echo "$HOME/.wasmtime/bin" >> "$GITHUB_PATH"
+      - name: Run wasm benchmark/runtime checks
+        run: ./scripts/benchmark_wasm.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-benchmark-report
+          path: wasm-benchmark-report.txt
 
   wasm-size-trend:
     runs-on: ubuntu-latest
@@ -45,9 +63,9 @@ jobs:
       - name: Build wasm variants
         run: |
           set -eux
-          CARGO_TARGET_DIR=target-wasm-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features block --crate-type=cdylib
-          CARGO_TARGET_DIR=target-wasm-frame cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame --crate-type=cdylib
-          CARGO_TARGET_DIR=target-wasm-frame-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame,block --crate-type=cdylib
+          CARGO_TARGET_DIR=target-wasm-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features block,wasm-exports --crate-type=cdylib
+          CARGO_TARGET_DIR=target-wasm-frame cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame,wasm-exports --crate-type=cdylib
+          CARGO_TARGET_DIR=target-wasm-frame-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame,block,wasm-exports --crate-type=cdylib
       - name: Produce size report
         run: |
           set -eu

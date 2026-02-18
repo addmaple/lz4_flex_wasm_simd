@@ -19,6 +19,7 @@ safe-encode = []
 checked-decode = []
 nightly = []
 wasm-simd = []
+wasm-exports = []
 
 [dev-dependencies]
 more-asserts = "0.3.1"

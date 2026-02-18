@@ -49,3 +49,7 @@ pub mod simd;
     forbid(unsafe_code)
 )]
 pub(crate) mod sink;
+
+#[cfg(feature = "wasm-exports")]
+#[allow(missing_docs)]
+mod wasm_exports;
