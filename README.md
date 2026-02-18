@@ -39,6 +39,16 @@ Tuning knobs:
 - `BENCH_REAL_FIXTURES` (default `1`)
 - `BENCH_FIXTURE_DIR` (default `./bench-data`)
 
+### Data shapes where this crate is faster (current benches)
+
+From `/Users/addmaple/sites/lz4_flex_wasm_simd/BENCHMARK_RESULTS.md` (2026-02-18 run):
+
+- WCOL-like decompress shapes (`wcol-index-like`, `wcol-bitmap-like`, `wcol-string-page-like`): `lz4_flex_wasm_simd` is materially faster than `lz4_flex` and `lz_fear`.
+- Repetitive JSON decompress (synthetic): `lz4_flex_wasm_simd` is much faster than `lz4_flex` and `lz_fear`.
+- Real-world 50 KiB fixtures:
+  - text fixture: `lz4_flex_wasm_simd` and `lz4_flex` are close; `lz4_flex_wasm_simd` is competitive on compress/decompress.
+  - json fixture: scalar paths are close; SIMD mode improves `lz4_flex_wasm_simd` decompress.
+
 ## Provenance
 
 This crate vendors selected code from:

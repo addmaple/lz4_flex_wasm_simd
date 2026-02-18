@@ -25,12 +25,17 @@ SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm
 
 ## Median Runtime (ms)
 
-### Synthetic (`PAYLOAD_BYTES=262144`)
+### Synthetic Compression + Baseline Decompression (`PAYLOAD_BYTES=262144`)
 
 | Case | simdcrate/scalar | simdcrate/simd | lz4_flex/scalar | lz_fear/scalar |
 |---|---:|---:|---:|---:|
 | compress | 35 | 21 | 27 | 25 |
 | decompress (repetitive-json) | 27 | 28 | 111 | 116 |
+
+### WCOL-like Decompression Shapes (`PAYLOAD_BYTES=262144`)
+
+| Case | simdcrate/scalar | simdcrate/simd | lz4_flex/scalar | lz_fear/scalar |
+|---|---:|---:|---:|---:|
 | decompress (wcol-index-like) | 46 | 47 | 68 | 279 |
 | decompress (wcol-bitmap-like) | 23 | 22 | 52 | 78 |
 | decompress (wcol-string-page-like) | 45 | 43 | 66 | 209 |
@@ -56,4 +61,3 @@ SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm
 
 1. `./scripts/prepare_bench_fixtures.sh`
 2. `SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm.sh`
-
