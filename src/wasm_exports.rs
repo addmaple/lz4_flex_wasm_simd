@@ -1,3 +1,4 @@
+use alloc::{string::String, vec};
 use alloc::vec::Vec;
 use core::hash::Hasher;
 
