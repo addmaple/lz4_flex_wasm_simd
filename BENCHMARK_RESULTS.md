@@ -32,13 +32,13 @@ SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm
 | compress | 35 | 21 | 27 | 25 |
 | decompress (repetitive-json) | 27 | 28 | 111 | 116 |
 
-### WCOL-like Decompression Shapes (`PAYLOAD_BYTES=262144`)
+### Decompression Data Shapes (`PAYLOAD_BYTES=262144`)
 
 | Case | simdcrate/scalar | simdcrate/simd | lz4_flex/scalar | lz_fear/scalar |
 |---|---:|---:|---:|---:|
-| decompress (wcol-index-like) | 46 | 47 | 68 | 279 |
-| decompress (wcol-bitmap-like) | 23 | 22 | 52 | 78 |
-| decompress (wcol-string-page-like) | 45 | 43 | 66 | 209 |
+| decompress (dense integer index stream) | 46 | 47 | 68 | 279 |
+| decompress (sparse bitmap stream) | 23 | 22 | 52 | 78 |
+| decompress (string-page block stream) | 45 | 43 | 66 | 209 |
 
 ### Real-world Fixtures (50 KB)
 
@@ -51,7 +51,7 @@ SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm
 
 ## Observations
 
-- On synthetic WCOL-like decompress workloads, `lz4_flex_wasm_simd` is substantially faster than both `lz4_flex` and `lz_fear`.
+- On synthetic decompress workloads shaped like dense index, sparse bitmap, and string-page blocks, `lz4_flex_wasm_simd` is substantially faster than both `lz4_flex` and `lz_fear`.
 - On real 50 KB fixtures:
   - Text fixture: `lz4_flex_wasm_simd` scalar is slightly better than `lz4_flex` in both compress and decompress.
   - JSON fixture: `lz4_flex` and `lz4_flex_wasm_simd` scalar are close; SIMD helps `lz4_flex_wasm_simd` on JSON decompress.

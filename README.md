@@ -43,7 +43,7 @@ Tuning knobs:
 
 From `/Users/addmaple/sites/lz4_flex_wasm_simd/BENCHMARK_RESULTS.md` (2026-02-18 run):
 
-- WCOL-like decompress shapes (`wcol-index-like`, `wcol-bitmap-like`, `wcol-string-page-like`): `lz4_flex_wasm_simd` is materially faster than `lz4_flex` and `lz_fear`.
+- Decompress data shapes (dense integer index stream, sparse bitmap stream, string-page block stream): `lz4_flex_wasm_simd` is materially faster than `lz4_flex` and `lz_fear`.
 - Repetitive JSON decompress (synthetic): `lz4_flex_wasm_simd` is much faster than `lz4_flex` and `lz_fear`.
 - Real-world 50 KiB fixtures:
   - text fixture: `lz4_flex_wasm_simd` and `lz4_flex` are close; `lz4_flex_wasm_simd` is competitive on compress/decompress.
