@@ -2,5 +2,7 @@
 /target-scalar
 /target-simd
 /target-bench-*
+/bench/*/target
+/bench/*/Cargo.lock
 wasm-benchmark-report.txt
 wasm-benchmark-report.md
