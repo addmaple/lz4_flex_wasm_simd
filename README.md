@@ -30,6 +30,12 @@ For runtime verification and scalar-vs-SIMD benchmark numbers:
 This script builds `frame,block,wasm-exports` variants, runs wasm entrypoint checks with `wasmtime`,
 and writes `wasm-benchmark-report.txt`.
 
+Tuning knobs:
+- `SAMPLES` (default `11`)
+- `WARMUP` (default `3`)
+- `INNER_ITERS` (default `800`)
+- `PAYLOAD_BYTES` (default `262144`)
+
 ## Provenance
 
 This crate vendors selected code from:
