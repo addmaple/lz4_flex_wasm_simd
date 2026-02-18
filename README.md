@@ -49,6 +49,9 @@ From `/Users/addmaple/sites/lz4_flex_wasm_simd/BENCHMARK_RESULTS.md` (2026-02-18
   - text fixture: `lz4_flex_wasm_simd` and `lz4_flex` are close; `lz4_flex_wasm_simd` is competitive on compress/decompress.
   - json fixture: scalar paths are close; SIMD mode improves `lz4_flex_wasm_simd` decompress.
 
+Size note: benchmark runtime builds here use `frame,block,wasm-exports,decompress-prof` for this crate.
+For apples-to-apples size with adapter scope (`std,block,wasm-exports`), see the implementation size rows in `/Users/addmaple/sites/lz4_flex_wasm_simd/BENCHMARK_RESULTS.md`.
+
 ## Provenance
 
 This crate vendors selected code from:

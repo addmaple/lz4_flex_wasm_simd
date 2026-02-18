@@ -18,10 +18,17 @@ SAMPLES=5 WARMUP=2 INNER_ITERS=200 PAYLOAD_BYTES=262144 ./scripts/benchmark_wasm
 
 | Implementation | Mode | WASM size |
 |---|---|---:|
-| `lz4_flex_wasm_simd` | scalar | 211,893 B |
-| `lz4_flex_wasm_simd` | simd128 | 211,821 B |
+| `lz4_flex_wasm_simd` (block-only, apples-to-apples) | scalar | 166,676 B |
+| `lz4_flex_wasm_simd` (block-only, apples-to-apples) | simd128 | 166,567 B |
+| `lz4_flex_wasm_simd` (frame+block bench config) | scalar | 211,893 B |
+| `lz4_flex_wasm_simd` (frame+block bench config) | simd128 | 211,821 B |
 | `lz4_flex` | scalar | 169,957 B |
 | `lz_fear` | scalar | 173,905 B |
+
+Notes:
+
+- Runtime benchmark numbers below are from the `frame+block` bench config.
+- The `block-only, apples-to-apples` rows use `std,block,wasm-exports` so they match adapter feature scope.
 
 ## Median Runtime (ms)
 
