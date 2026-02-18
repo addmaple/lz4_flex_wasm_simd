@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "block"
+          - "frame"
+          - "frame,block"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test (${{ matrix.features }})
+        run: cargo test --no-default-features --features ${{ matrix.features }}
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1,wasm32-unknown-unknown
+      - name: Check wasm (scalar)
+        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block
+      - name: Check wasm (+simd128)
+        env:
+          RUSTFLAGS: -C target-feature=+simd128
+        run: cargo check --target wasm32-wasip1 --no-default-features --features frame,block
+
+  wasm-size-trend:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - name: Build wasm variants
+        run: |
+          set -eux
+          CARGO_TARGET_DIR=target-wasm-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features block --crate-type=cdylib
+          CARGO_TARGET_DIR=target-wasm-frame cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame --crate-type=cdylib
+          CARGO_TARGET_DIR=target-wasm-frame-block cargo rustc --release --target wasm32-wasip1 --no-default-features --features frame,block --crate-type=cdylib
+      - name: Produce size report
+        run: |
+          set -eu
+          {
+            echo "# WASM size trend report"
+            echo
+            for VARIANT in block frame frame-block; do
+              if [ "$VARIANT" = "frame-block" ]; then
+                BASE=target-wasm-frame-block
+              else
+                BASE=target-wasm-$VARIANT
+              fi
+              WASM_PATH="$BASE/wasm32-wasip1/release/lz4_flex_wasm_simd.wasm"
+              if [ -f "$WASM_PATH" ]; then
+                echo "$VARIANT: $(wc -c < \"$WASM_PATH\") bytes"
+              else
+                echo "$VARIANT: artifact missing"
+              fi
+            done
+          } > wasm-size-report.txt
+          cat wasm-size-report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-size-report
+          path: wasm-size-report.txt

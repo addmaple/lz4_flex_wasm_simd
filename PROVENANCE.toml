@@ -1,0 +1,48 @@
+[[source]]
+path = "src/block"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = true
+
+[[source]]
+path = "src/frame"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = true
+
+[[source]]
+path = "src/fastcpy.rs"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = false
+
+[[source]]
+path = "src/fastcpy_unsafe.rs"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = false
+
+[[source]]
+path = "src/sink.rs"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = false
+
+[[source]]
+path = "src/simd.rs"
+origin_repo = "https://github.com/pseitz/lz4_flex"
+origin_commit = "975bfa7ac9583da879b5d7578b423232d84f69fe"
+license = "MIT"
+modified = false
+
+[[source]]
+path = "src/hash/xxhash32.rs"
+origin_repo = "https://github.com/shepmaster/twox-hash"
+origin_commit = "bc5bb80b4857707e0372d2386157b1d31e4441d3"
+license = "MIT"
+modified = true
