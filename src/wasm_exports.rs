@@ -31,6 +31,10 @@ const PROFILE_COUNTER_COPY_FROM_DICT_CALLS: u32 = 6;
 const PROFILE_COUNTER_LITERAL_BYTES: u32 = 7;
 const PROFILE_COUNTER_MATCH_BYTES: u32 = 8;
 const PROFILE_COUNTER_CHECKSUM: u32 = 100;
+const FIXTURE_TEXT_50KB: u32 = 0;
+const FIXTURE_JSON_50KB: u32 = 1;
+const TEXT_50KB_BYTES: &[u8] = include_bytes!("../bench-data/text_50kb.txt");
+const JSON_50KB_BYTES: &[u8] = include_bytes!("../bench-data/json_50kb.json");
 
 fn payload_repetitive_json(size: usize) -> Vec<u8> {
     let pat =
@@ -151,6 +155,14 @@ fn payload_for_case(size: usize, case_id: u32) -> Vec<u8> {
     }
 }
 
+fn payload_for_fixture(fixture_id: u32) -> &'static [u8] {
+    match fixture_id {
+        FIXTURE_TEXT_50KB => TEXT_50KB_BYTES,
+        FIXTURE_JSON_50KB => JSON_50KB_BYTES,
+        _ => TEXT_50KB_BYTES,
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn wasm_block_roundtrip() -> i32 {
     let input = payload_repetitive_json(256 * 1024);
@@ -184,6 +196,24 @@ pub extern "C" fn wasm_compress_repeated(iters: u32, size: u32) -> u64 {
 
     for i in 0..iters {
         let compressed = crate::block::compress(&input);
+        let len = compressed.len() as u64;
+        let sample = compressed
+            .get((i as usize) % compressed.len().max(1))
+            .copied()
+            .unwrap_or(0) as u64;
+        acc = acc.wrapping_add(len).wrapping_add(sample << 8);
+    }
+
+    acc
+}
+
+#[no_mangle]
+pub extern "C" fn wasm_compress_repeated_fixture(iters: u32, fixture_id: u32) -> u64 {
+    let input = payload_for_fixture(fixture_id);
+    let mut acc = 0u64;
+
+    for i in 0..iters {
+        let compressed = crate::block::compress(input);
         let len = compressed.len() as u64;
         let sample = compressed
             .get((i as usize) % compressed.len().max(1))
@@ -319,6 +349,31 @@ pub extern "C" fn wasm_decompress_repeated_case(iters: u32, size: u32, case_id: 
         match crate::block::decompress_into(&compressed, &mut output) {
             Ok(decoded_len) => {
                 let decoded = &output[..decoded_len];
+                acc = acc
+                    .wrapping_add(decoded.len() as u64)
+                    .wrapping_add(decoded.first().copied().unwrap_or(0) as u64);
+            }
+            Err(_) => return 0,
+        }
+    }
+
+    acc
+}
+
+#[no_mangle]
+pub extern "C" fn wasm_decompress_repeated_fixture(iters: u32, fixture_id: u32) -> u64 {
+    let input = payload_for_fixture(fixture_id);
+    let compressed = crate::block::compress(input);
+    let mut output = vec![0u8; input.len()];
+    let mut acc = 0u64;
+
+    for _ in 0..iters {
+        match crate::block::decompress_into(&compressed, &mut output) {
+            Ok(decoded_len) => {
+                let decoded = &output[..decoded_len];
+                if decoded != input {
+                    return 0;
+                }
                 acc = acc
                     .wrapping_add(decoded.len() as u64)
                     .wrapping_add(decoded.first().copied().unwrap_or(0) as u64);

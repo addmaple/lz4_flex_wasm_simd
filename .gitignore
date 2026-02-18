@@ -1,4 +1,6 @@
 /target
 /target-scalar
 /target-simd
+/target-bench-*
 wasm-benchmark-report.txt
+wasm-benchmark-report.md

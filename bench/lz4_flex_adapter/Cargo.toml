@@ -1,0 +1,11 @@
+[package]
+name = "lz4_flex_adapter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lz4_flex = { version = "0.12.0", default-features = false, features = ["std", "safe-decode", "safe-encode", "checked-decode"] }
