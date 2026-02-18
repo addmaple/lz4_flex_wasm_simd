@@ -7,7 +7,14 @@ license = "MIT"
 description = "Opinionated LZ4 crate optimized for WASM SIMD and small binaries"
 repository = "https://github.com/addmaple/lz4_flex_wasm_simd"
 readme = "README.md"
-include = ["src/**", "README.md", "LICENSE", "ATTRIBUTION.md", "PROVENANCE.toml"]
+include = [
+    "src/**",
+    "README.md",
+    "LICENSE",
+    "ATTRIBUTION.md",
+    "PROVENANCE.toml",
+    "CHANGELOG.md",
+]
 
 [features]
 default = ["block"]
